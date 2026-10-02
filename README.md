@@ -22,6 +22,7 @@ paciente.
 ```text
 Proyecto_Final_bdd/
 ├── appHospital.sql
+├── pl_sql.sql
 ├── build.gradle
 ├── gradlew
 ├── gradlew.bat
@@ -37,7 +38,11 @@ Proyecto_Final_bdd/
 - `ConexionSQL`: centraliza los datos de conexión y abre conexiones JDBC.
 - `Paciente`: modelo Java que representa un paciente.
 - `PacienteDAO`: contiene las consultas SQL del CRUD.
-- `appHospital.sql`: crea la base de datos, sus tablas y registros de ejemplo.
+- `appHospital.sql`: crea la base de datos, sus tablas, registros de ejemplo y
+  consultas SQL de demostración.
+- `pl_sql.sql`: configura el modo Oracle de MariaDB y crea procedimientos
+  almacenados para consultas y operaciones que no forman parte del menú CRUD
+  de Java.
 
 ## Requisitos previos
 
@@ -49,7 +54,8 @@ Proyecto_Final_bdd/
 ## Preparación de la base de datos
 
 El script [`appHospital.sql`](./appHospital.sql) crea la base de datos
-`aplicacion_medica` y las tablas relacionadas. Para prepararla:
+`aplicacion_medica`, las tablas relacionadas y los registros iniciales. Para
+prepararla:
 
 1. Iniciar el servidor de MariaDB.
 2. Abrir el cliente de MariaDB o una herramienta como HeidiSQL, DBeaver o
@@ -57,6 +63,111 @@ El script [`appHospital.sql`](./appHospital.sql) crea la base de datos
 3. Ejecutar el contenido de `appHospital.sql`.
 4. Confirmar que exista la base de datos `aplicacion_medica` y que la tabla
    `Pacientes` tenga los registros iniciales.
+5. Opcionalmente, ejecutar [`pl_sql.sql`](./pl_sql.sql) después de crear la
+   base de datos y sus tablas.
+
+Los scripts tienen responsabilidades diferentes:
+
+| Archivo | Responsabilidad | Cómo debe ejecutarse |
+| --- | --- | --- |
+| [`appHospital.sql`](./appHospital.sql) | Crea el esquema `aplicacion_medica`, las tablas, las claves foráneas, las restricciones, los registros iniciales y consultas SQL de demostración. | Primero, como script de instalación de la base de datos. |
+| [`pl_sql.sql`](./pl_sql.sql) | Activa `SQL_MODE = 'ORACLE'` y crea procedimientos almacenados para consultar ventas, consultar clientes vigentes y agregar pacientes con manejo de duplicados. | Después de `appHospital.sql`, cuando las tablas ya existen. |
+| Java/JDBC | Ejecuta el CRUD de `Pacientes` desde el menú de consola mediante `PacienteDAO`. | Después de preparar la base de datos y configurar la conexión. |
+
+`pl_sql.sql` no reemplaza a `appHospital.sql`: no crea la base de datos ni las
+tablas. Asimismo, el programa Java no necesita ejecutar los procedimientos
+almacenados para realizar su CRUD; ambos mecanismos utilizan la misma base de
+datos, pero representan capas de trabajo distintas.
+
+## Procedimientos almacenados de `pl_sql.sql`
+
+El archivo [`pl_sql.sql`](./pl_sql.sql) contiene una capa de consultas y
+operaciones almacenadas en MariaDB. Su sintaxis se aproxima a PL/SQL mediante
+el modo de compatibilidad Oracle:
+
+```sql
+SET SQL_MODE = 'ORACLE';
+USE aplicacion_medica;
+```
+
+El archivo utiliza `DELIMITER //` mientras define cada procedimiento, porque
+el cuerpo de un procedimiento contiene varias instrucciones terminadas con
+`;`. Al finalizar cada definición restaura `DELIMITER ;`.
+
+### 1. `VentasDiarias`
+
+```sql
+CALL VentasDiarias('2026-09-30');
+```
+
+Devuelve dos resultados:
+
+1. El desglose de pagos registrados en `Pagos_fac` para la fecha indicada.
+2. El total vendido ese día mediante `SUM(Monto_pagar)`.
+
+### 2. `ClientesVigentes`
+
+```sql
+CALL ClientesVigentes(2026);
+```
+
+Lista pacientes que tienen una cita durante el primer trimestre del año
+recibido. Relaciona `Pacientes` con `Citas` y ordena los resultados por
+apellido paterno y nombre. La condición usa el inicio de enero y el inicio de
+abril para incluir correctamente todo el primer trimestre, incluso si la fecha
+de la cita incluye hora.
+
+### 3. `AgregarPaciente`
+
+```sql
+CALL AgregarPaciente(
+    'Rigoberto',
+    'Godoy',
+    'Flores',
+    '2000-04-10',
+    'Masculino',
+    'Av. Reforma 123',
+    '8145678901',
+    'rigoberpro426@gmail.com',
+    '8144444444',
+    'A+',
+    'Ninguna'
+);
+```
+
+Inserta un paciente en `Pacientes`. Si la inserción es correcta, devuelve un
+mensaje de confirmación. Si se viola una restricción única, maneja
+`DUP_VAL_ON_INDEX` y devuelve un mensaje indicando que el correo ya existe.
+Los tipos de los parámetros se declaran explícitamente para mantener
+compatibilidad con las versiones de MariaDB que soportan el modo Oracle.
+
+### Orden recomendado de ejecución
+
+1. Ejecutar [`appHospital.sql`](./appHospital.sql).
+2. Verificar que la base de datos seleccionada sea `aplicacion_medica`.
+3. Ejecutar [`pl_sql.sql`](./pl_sql.sql) como script completo, incluyendo sus
+   instrucciones `DELIMITER`.
+4. Revisar que los procedimientos existan:
+
+```sql
+SHOW PROCEDURE STATUS
+WHERE Db = 'aplicacion_medica';
+```
+
+5. Ejecutar los `CALL` de prueba incluidos en `pl_sql.sql` o invocar cada
+   procedimiento por separado.
+
+`DELIMITER` es una directiva del cliente de MariaDB, no una instrucción
+almacenada en el servidor. Por ello, algunos editores requieren utilizar
+**Ejecutar script** en lugar de **Ejecutar selección**. Si el cliente no
+reconoce `DELIMITER`, se debe ejecutar cada definición desde el monitor de
+MariaDB o configurar el editor para procesar scripts con delimitadores.
+
+El modo Oracle de MariaDB proporciona compatibilidad parcial con PL/SQL; no
+convierte MariaDB en un servidor Oracle. La sintaxis y las funciones
+compatibles pueden variar según la versión instalada. La aplicación Java
+continúa usando SQL y JDBC de MariaDB independientemente de que se haya
+ejecutado `pl_sql.sql`.
 
 El script define estas relaciones:
 
@@ -325,4 +436,3 @@ alguna consulta falla.
   controlado en una versión de producción.
 - La contraseña vacía del usuario `root` es una configuración local de
   desarrollo y debe cambiarse en instalaciones que requieran autenticación.
-
