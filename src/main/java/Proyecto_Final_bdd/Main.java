@@ -23,7 +23,9 @@ public class Main {
             System.out.println("2. Listar pacientes");
             System.out.println("3. Actualizar paciente");
             System.out.println("4. Eliminar paciente");
-            System.out.println("5. Salir");
+            System.out.println("5. Reporte de ventas diarias");
+            System.out.println("6. Reporte de clientes vigentes");
+            System.out.println("7. Salir");
             System.out.println("================================");
             System.out.println("Seleccione una opcion:");
 
@@ -54,6 +56,14 @@ public class Main {
                     break;
 
                 case 5:
+                    reporteVentas(scanner, dao);
+                    break;
+
+                case 6:
+                    reporteClientesVigentes(scanner, dao);
+                    break;
+
+                case 7:
                     System.out.println("Saliendo del programa...");
                     break;
 
@@ -61,7 +71,7 @@ public class Main {
                     System.out.println("Opcion no valida.");
             }
 
-        } while (opcion != 5);
+        } while (opcion != 7);
 
         scanner.close();
     }
@@ -434,6 +444,46 @@ public class Main {
             dao.eliminar(id);
         } else {
             System.out.println("Operacion cancelada.");
+        }
+    }
+
+    public static void reporteVentas(
+            Scanner scanner,
+            PacienteDAO dao) {
+        System.out.println();
+        System.out.println("----- VENTAS DIARIAS -----");
+        System.out.println("Fecha (YYYY-MM-DD):");
+        String fechaTexto = scanner.nextLine();
+
+        if (cancelar(fechaTexto)) {
+            System.out.println("Operacion cancelada.");
+            return;
+        }
+
+        try {
+            dao.ventasDiarias(LocalDate.parse(fechaTexto));
+        } catch (Exception e) {
+            System.out.println("Formato de fecha invalido. Use YYYY-MM-DD.");
+        }
+    }
+
+    public static void reporteClientesVigentes(
+            Scanner scanner,
+            PacienteDAO dao) {
+        System.out.println();
+        System.out.println("----- CLIENTES VIGENTES -----");
+        System.out.println("Anio:");
+        String anioTexto = scanner.nextLine();
+
+        if (cancelar(anioTexto)) {
+            System.out.println("Operacion cancelada.");
+            return;
+        }
+
+        try {
+            dao.clientesVigentes(Integer.parseInt(anioTexto));
+        } catch (NumberFormatException e) {
+            System.out.println("El anio debe ser un numero.");
         }
     }
 }

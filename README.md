@@ -37,12 +37,13 @@ Proyecto_Final_bdd/
   operaciones.
 - `ConexionSQL`: centraliza los datos de conexión y abre conexiones JDBC.
 - `Paciente`: modelo Java que representa un paciente.
-- `PacienteDAO`: contiene las consultas SQL del CRUD.
+- `PacienteDAO`: contiene las consultas SQL del CRUD y las llamadas JDBC a los
+  procedimientos almacenados.
 - `appHospital.sql`: crea la base de datos, sus tablas, registros de ejemplo y
   consultas SQL de demostración.
 - `pl_sql.sql`: configura el modo Oracle de MariaDB y crea procedimientos
-  almacenados para consultas y operaciones que no forman parte del menú CRUD
-  de Java.
+  almacenados para el alta de pacientes y los reportes disponibles desde el
+  menú de Java.
 
 ## Requisitos previos
 
@@ -63,8 +64,9 @@ prepararla:
 3. Ejecutar el contenido de `appHospital.sql`.
 4. Confirmar que exista la base de datos `aplicacion_medica` y que la tabla
    `Pacientes` tenga los registros iniciales.
-5. Opcionalmente, ejecutar [`pl_sql.sql`](./pl_sql.sql) después de crear la
-   base de datos y sus tablas.
+5. Ejecutar [`pl_sql.sql`](./pl_sql.sql) después de crear la base de datos y
+   sus tablas. Este paso es necesario para registrar pacientes desde Java y
+   utilizar los reportes almacenados.
 
 Los scripts tienen responsabilidades diferentes:
 
@@ -72,12 +74,13 @@ Los scripts tienen responsabilidades diferentes:
 | --- | --- | --- |
 | [`appHospital.sql`](./appHospital.sql) | Crea el esquema `aplicacion_medica`, las tablas, las claves foráneas, las restricciones, los registros iniciales y consultas SQL de demostración. | Primero, como script de instalación de la base de datos. |
 | [`pl_sql.sql`](./pl_sql.sql) | Activa `SQL_MODE = 'ORACLE'` y crea procedimientos almacenados para consultar ventas, consultar clientes vigentes y agregar pacientes con manejo de duplicados. | Después de `appHospital.sql`, cuando las tablas ya existen. |
-| Java/JDBC | Ejecuta el CRUD de `Pacientes` desde el menú de consola mediante `PacienteDAO`. | Después de preparar la base de datos y configurar la conexión. |
+| Java/JDBC | Ejecuta el CRUD de `Pacientes` y llama a los procedimientos almacenados desde el menú de consola mediante `PacienteDAO`. | Después de preparar la base de datos, ejecutar `pl_sql.sql` y configurar la conexión. |
 
 `pl_sql.sql` no reemplaza a `appHospital.sql`: no crea la base de datos ni las
-tablas. Asimismo, el programa Java no necesita ejecutar los procedimientos
-almacenados para realizar su CRUD; ambos mecanismos utilizan la misma base de
-datos, pero representan capas de trabajo distintas.
+tablas. El alta de pacientes y los reportes del menú Java utilizan los
+procedimientos almacenados mediante `CallableStatement`; la actualización y
+eliminación siguen usando SQL transaccional porque no existe un procedimiento
+equivalente para esas operaciones.
 
 ## Procedimientos almacenados de `pl_sql.sql`
 
@@ -156,6 +159,7 @@ WHERE Db = 'aplicacion_medica';
 
 5. Ejecutar los `CALL` de prueba incluidos en `pl_sql.sql` o invocar cada
    procedimiento por separado.
+6. Ejecutar la aplicación Java con `gradlew.bat run`.
 
 `DELIMITER` es una directiva del cliente de MariaDB, no una instrucción
 almacenada en el servidor. Por ello, algunos editores requieren utilizar
@@ -165,9 +169,11 @@ MariaDB o configurar el editor para procesar scripts con delimitadores.
 
 El modo Oracle de MariaDB proporciona compatibilidad parcial con PL/SQL; no
 convierte MariaDB en un servidor Oracle. La sintaxis y las funciones
-compatibles pueden variar según la versión instalada. La aplicación Java
-continúa usando SQL y JDBC de MariaDB independientemente de que se haya
-ejecutado `pl_sql.sql`.
+compatibles pueden variar según la versión instalada. La aplicación Java usa
+JDBC de MariaDB: `CallableStatement` para `AgregarPaciente`, `VentasDiarias`
+y `ClientesVigentes`, y `PreparedStatement` para listar, consultar, actualizar
+y eliminar pacientes. Por esta razón, `pl_sql.sql` debe ejecutarse antes de
+usar el alta y los reportes desde el programa.
 
 El script define estas relaciones:
 
@@ -252,7 +258,9 @@ Al iniciar aparece el menú:
 2. Listar pacientes
 3. Actualizar paciente
 4. Eliminar paciente
-5. Salir
+5. Reporte de ventas diarias
+6. Reporte de clientes vigentes
+7. Salir
 ```
 
 Si se introduce un valor que no es un número, el programa muestra un mensaje
@@ -267,7 +275,8 @@ de validación y vuelve a mostrar el menú.
 3. El DAO llama a `ConexionSQL.conectar()`.
 4. `DriverManager` intenta conectarse a MariaDB usando la URL y credenciales
    configuradas.
-5. El DAO crea un `PreparedStatement`.
+5. El DAO crea un `PreparedStatement` o un `CallableStatement`, según la
+   operación.
 6. Los valores del modelo `Paciente` o del ID recibido se asignan a los
    parámetros `?`.
 7. Se ejecuta la consulta.
@@ -299,7 +308,7 @@ corresponde a:
 
 | Operación | Menú | Método DAO | SQL |
 | --- | ---: | --- | --- |
-| Create | 1 | `crear(Paciente)` | `INSERT INTO Pacientes` |
+| Create | 1 | `crear(Paciente)` | `CALL AgregarPaciente(...)` |
 | Read | 2 | `listar()` | `SELECT ... FROM Pacientes` |
 | Read por ID | 3 y 4 | `mostrarPorId(int)` | `SELECT ... WHERE Id_Pac = ?` |
 | Update | 3 | `actualizar(Paciente)` | `UPDATE Pacientes ... WHERE Id_Pac = ?` |
@@ -329,9 +338,10 @@ La fecha debe escribirse con el formato `YYYY-MM-DD`; se convierte de texto a
 `A+`, `A-`, `B+`, `B-`, `AB+`, `AB-`, `O+` y `O-`.
 
 Después se construye un objeto `Paciente` y se envía a
-`PacienteDAO.crear(...)`. El DAO ejecuta un `INSERT` con once parámetros y
-muestra **“Paciente registrado correctamente.”** si la inserción termina con
-éxito.
+`PacienteDAO.crear(...)`. El DAO llama a `AgregarPaciente` mediante
+`CallableStatement` y muestra el mensaje devuelto por el procedimiento. Si el
+correo ya existe, el procedimiento devuelve el mensaje de error controlado
+por `DUP_VAL_ON_INDEX`.
 
 La base de datos valida además:
 
@@ -342,8 +352,17 @@ La base de datos valida además:
 - Género permitido.
 - Tipo de sangre permitido.
 
-Si se escribe `cancelar` en cualquier campo, la operación termina sin
-realizar el `INSERT`.
+Si se escribe `cancelar` en cualquier campo, la operación termina sin llamar
+al procedimiento.
+
+## Reportes almacenados
+
+Las opciones **5. Reporte de ventas diarias** y **6. Reporte de clientes
+vigentes** llaman, respectivamente, a `PacienteDAO.ventasDiarias(...)` y
+`PacienteDAO.clientesVigentes(...)`. Ambos métodos ejecutan los procedimientos
+de [`pl_sql.sql`](./pl_sql.sql) mediante `CallableStatement` y muestran sus
+resultados en consola. Para que estas opciones y el alta funcionen, se debe
+ejecutar `pl_sql.sql` después de `appHospital.sql`.
 
 ## Read: listar pacientes
 

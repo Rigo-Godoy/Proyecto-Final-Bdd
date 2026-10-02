@@ -1,6 +1,7 @@
 package Proyecto_Final_bdd;
 
 import java.sql.Connection;
+import java.sql.CallableStatement;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -9,28 +10,35 @@ public class PacienteDAO {
 
     // CREATE
     public void crear(Paciente paciente) {
-        String sql = """
-        INSERT INTO Pacientes (
-            Nom_Pac,
-            Ap_Pat_Pac,
-            Ap_Mat_Pac,
-            Fec_nacim,
-            Genero,
-            Dire_Pac,
-            Tel_Pac,
-            Correo_Pac,
-            Cont_Emer_Tel,
-            T_Sangre,
-            Alergias
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """;
+        String sql = "{CALL AgregarPaciente(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)}";
 
     try (
         Connection conexion = ConexionSQL.conectar();
-        PreparedStatement ps = conexion.prepareStatement(sql)
+        CallableStatement ps = conexion.prepareCall(sql)
     ) {
 
+        asignarDatosPaciente(ps, paciente);
+
+        if (ps.execute()) {
+            try (ResultSet rs = ps.getResultSet()) {
+                if (rs.next()) {
+                    System.out.println(rs.getString("Mensaje"));
+                }
+            }
+        } else {
+            System.out.println("El procedimiento AgregarPaciente no devolvio un mensaje.");
+        }
+
+    } catch (SQLException e) {
+
+        System.out.println("Error al ejecutar AgregarPaciente:");
+        e.printStackTrace();
+    }
+    }
+
+    private void asignarDatosPaciente(
+            CallableStatement ps,
+            Paciente paciente) throws SQLException {
         ps.setString(1, paciente.getNomPac());
         ps.setString(2, paciente.getApPatPac());
         ps.setString(3, paciente.getApMatPac());
@@ -42,16 +50,94 @@ public class PacienteDAO {
         ps.setString(9, paciente.getContEmerTel());
         ps.setString(10, paciente.getTSangre());
         ps.setString(11, paciente.getAlergias());
-
-        ps.executeUpdate();
-
-        System.out.println("Paciente registrado correctamente.");
-
-    } catch (SQLException e) {
-
-        System.out.println("Error al registrar paciente:");
-        e.printStackTrace();
     }
+
+    public void ventasDiarias(java.time.LocalDate fecha) {
+        String sql = "{CALL VentasDiarias(?)}";
+
+        try (
+            Connection conexion = ConexionSQL.conectar();
+            CallableStatement ps = conexion.prepareCall(sql)
+        ) {
+            ps.setDate(1, java.sql.Date.valueOf(fecha));
+
+            boolean hayResultado = ps.execute();
+            if (hayResultado) {
+                try (ResultSet rs = ps.getResultSet()) {
+                    System.out.println("------------------------------");
+                    System.out.println("Ventas del " + fecha + ":");
+                    boolean hayVentas = false;
+
+                    while (rs.next()) {
+                        hayVentas = true;
+                        System.out.println(
+                            "Pago #" + rs.getInt("Id_Pago")
+                            + " | Cita #" + rs.getInt("Id_Cita")
+                            + " | Monto: $" + rs.getBigDecimal("Monto_pagar")
+                            + " | Metodo: " + rs.getString("Met_pago")
+                            + " | Estado: " + rs.getString("Est_pago")
+                        );
+                    }
+
+                    if (!hayVentas) {
+                        System.out.println("No hay pagos registrados para esa fecha.");
+                    }
+                }
+            }
+
+            if (ps.getMoreResults()) {
+                try (ResultSet rs = ps.getResultSet()) {
+                    if (rs.next()) {
+                        System.out.println(
+                            "Total de ventas: $" + rs.getBigDecimal("Total_Ventas")
+                        );
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            System.out.println("Error al ejecutar VentasDiarias:");
+            e.printStackTrace();
+        }
+    }
+
+    public void clientesVigentes(int anio) {
+        String sql = "{CALL ClientesVigentes(?)}";
+
+        try (
+            Connection conexion = ConexionSQL.conectar();
+            CallableStatement ps = conexion.prepareCall(sql)
+        ) {
+            ps.setInt(1, anio);
+
+            if (ps.execute()) {
+                try (ResultSet rs = ps.getResultSet()) {
+                    System.out.println("------------------------------");
+                    System.out.println(
+                        "Clientes vigentes del primer trimestre de " + anio + ":"
+                    );
+                    boolean hayClientes = false;
+
+                    while (rs.next()) {
+                        hayClientes = true;
+                        System.out.println(
+                            "ID: " + rs.getInt("Id_Pac")
+                            + " | Nombre: " + rs.getString("Nom_Pac")
+                            + " " + rs.getString("Ap_Pat_Pac")
+                            + " " + rs.getString("Ap_Mat_Pac")
+                            + " | Telefono: " + rs.getString("Tel_Pac")
+                            + " | Correo: " + rs.getString("Correo_Pac")
+                        );
+                    }
+
+                    if (!hayClientes) {
+                        System.out.println("No hay clientes vigentes para ese periodo.");
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            System.out.println("Error al ejecutar ClientesVigentes:");
+            e.printStackTrace();
+        }
     }
 
     // READ
