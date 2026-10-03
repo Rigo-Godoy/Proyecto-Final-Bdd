@@ -1,18 +1,11 @@
-/* PUNTO 2 - PROCEDIMIENTO: VENTAS DIARIAS */
-
-/* =========================================================
-   PROCEDIMIENTOS ALMACENADOS
-   MariaDB con modo de compatibilidad Oracle
-   ========================================================= */
+/*PROCEDIMIENTOS ALMACENADOS EN MODO ORACLE*/
 
 SET SQL_MODE = 'ORACLE';
 
 USE aplicacion_medica;
 
 
-/* =========================================================
-   1. VENTAS DIARIAS
-   ========================================================= */
+/*PROCEDIMIENTO 1: VENTAS DIARIAS*/
 
 DELIMITER //
 
@@ -22,9 +15,7 @@ CREATE OR REPLACE PROCEDURE VentasDiarias(
 AS
 BEGIN
 
-    /* -----------------------------------------
-       Desglose de ventas del día
-       ----------------------------------------- */
+    /*DESGLOSE DE VENTAS DEL DIA*/
 
     SELECT
         pf.Id_Pago,
@@ -38,9 +29,7 @@ BEGIN
     WHERE DATE(pf.Fecha_pago) = fecha_busqueda;
 
 
-    /* -----------------------------------------
-       Total de ventas del día
-       ----------------------------------------- */
+    /*TOTAL DE VENTAS DEL DIA*/
 
     SELECT
         fecha_busqueda AS Fecha,
@@ -54,16 +43,12 @@ END VentasDiarias;
 DELIMITER ;
 
 
-/* =========================================================
-   EJECUCIÓN DE EJEMPLO
-   ========================================================= */
+/*EJECUCION DE EJEMPLO*/
 
 CALL VentasDiarias('2026-09-30');
 
 
-/* =========================================================
-   2. CLIENTES VIGENTES
-   ========================================================= */
+/*PROCEDIMIENTO 2: CLIENTES VIGENTES*/
 
 DELIMITER //
 
@@ -95,17 +80,13 @@ END ClientesVigentes;
 DELIMITER ;
 
 
-/* =========================================================
-   EJECUCIÓN DE EJEMPLO
-   ========================================================= */
+/*EJECUCION DE EJEMPLO*/
 
 CALL ClientesVigentes(2026);
 
 
-/* =========================================================
-   3. AGREGAR PACIENTE
-      MANEJO DE EXCEPCIÓN POR CORREO DUPLICADO
-   ========================================================= */
+/*PROCEDIMIENTO 3: AGREGAR PACIENTE*/
+/*MANEJO DE EXCEPCION POR CORREO DUPLICADO*/
 
 DELIMITER //
 
@@ -125,9 +106,7 @@ CREATE OR REPLACE PROCEDURE AgregarPaciente(
 AS
 BEGIN
 
-    /* -----------------------------------------
-       Inserción del paciente
-       ----------------------------------------- */
+    /*INSERTAR PACIENTE*/
 
     INSERT INTO Pacientes (
         Nom_Pac,
@@ -157,9 +136,7 @@ BEGIN
     );
 
 
-    /* -----------------------------------------
-       Mensaje de operación exitosa
-       ----------------------------------------- */
+    /*MENSAJE DE OPERACION EXITOSA*/
 
     SELECT
         'Paciente agregado correctamente.' AS Mensaje;
@@ -167,9 +144,7 @@ BEGIN
 
 EXCEPTION
 
-    /* -----------------------------------------
-       Excepción por restricción UNIQUE
-       ----------------------------------------- */
+    /*EXCEPCION POR RESTRICCION UNIQUE*/
 
     WHEN DUP_VAL_ON_INDEX THEN
 
@@ -186,17 +161,15 @@ END AgregarPaciente;
 DELIMITER ;
 
 
-/* =========================================================
-   PRUEBA DEL PROCEDIMIENTO AgregarPaciente
-   ========================================================= */
+/*PRUEBA DEL PROCEDIMIENTO AGREGAR PACIENTE*/
 
 /*
-   Este correo ya existe en la tabla Pacientes:
+   ESTE CORREO YA EXISTE EN LA TABLA PACIENTES:
 
    juan.perez@gmail.com
 
-   Por lo tanto, esta prueba debe activar
-   la excepción DUP_VAL_ON_INDEX.
+   POR LO TANTO, ESTA PRUEBA DEBE ACTIVAR
+   LA EXCEPCION DUP_VAL_ON_INDEX.
 */
 
 CALL AgregarPaciente(
@@ -207,16 +180,14 @@ CALL AgregarPaciente(
     'Masculino',
     'Av. Reforma 123',
     '8145678901',
-    'rigoberpro426@gmail.com',
+    'juan.perez@gmail.com',
     '8144444444',
     'A+',
     'Ninguna'
 );
 
 
-/* =========================================================
-   VERIFICACIÓN DE PROCEDIMIENTOS
-   ========================================================= */
+/*VERIFICACION DE PROCEDIMIENTOS*/
 
 SHOW PROCEDURE STATUS
 WHERE Db = 'aplicacion_medica';

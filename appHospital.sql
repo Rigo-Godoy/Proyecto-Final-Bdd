@@ -377,3 +377,22 @@ INNER JOIN Citas c ON m.Id_Doc = c.Id_Doc
 GROUP BY m.Id_Doc, m.Especializacion, m.Nom_doc, m.Ap_Pat_Doc
 HAVING COUNT(c.Id_Cita) > 0
 ORDER BY Total_Citas_Atendidas DESC;
+
+
+/*INSERTAR REGISTRO EN PAGOOS_FAC CON FECHA_PAGO */
+INSERT INTO Pagos_fac (
+    Id_Cita,
+    Monto_pagar,
+    Desg_gastos,
+    Met_pago,
+    Est_pago,
+    Fecha_pago
+)
+VALUES (
+    4,
+    950.00,
+    'Consulta general',
+    'Efectivo',
+    'Aprobado',
+    '2026-10-02 10:30:00'
+);
